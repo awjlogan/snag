@@ -44,7 +44,7 @@ class SnagTask:
         # Scale the due by time factoring duration and time offset
         due_by_dt: datetime.datetime = datetime.datetime.fromisoformat(self.due_by)
         due_by_dt = due_by_dt - datetime.timedelta(minutes=(self.time_offset + self.duration_scheduled))
-        self.due_by = due_by_dt.isoformat()
+        self.due_by = due_by_dt.strftime("%Y-%m-%dT%H:%M")
 
 
 def query_api(url: str, verbose: bool = False) -> json:
@@ -198,7 +198,7 @@ def weight_timepoints(task: SnagTask, timepoints: List[Tuple[str, int]]) -> None
     # implicitly shrink the timepoints list (overflow at the end), but values
     # here will not be used anyway as the task must have started before that
     for idx in range(len(timepoints) - len(window)):
-        weighted_avg: int = sum([a * b[1] for a, b in zip(window, timepoints[idx:idx+len(window)])])
+        weighted_avg: int = sum([a * b[1] for a, b in zip(window, timepoints[idx:(idx + len(window))])])
         weighted_avg = int(weighted_avg / sum(window))
         timepoints[idx] = (timepoints[idx][0], weighted_avg)
 
@@ -222,8 +222,8 @@ def schedule_task(task: SnagTask, verbose: bool = False) -> None:
 
     if verbose:
         print(f"Scheduling [{task.cmd}]")
-        print(f"    Time now       : {time_now.isoformat()}")
-        print(f"    Due by         : {task.due_by}:")
+        print(f"    Time now       : {time_now.strftime('%Y-%m-%d %H:%M')}")
+        print(f"    Due by         : {' '.join(task.due_by.split('T'))}")
 
     try:
         numeric: int = int(task.outward_code)
