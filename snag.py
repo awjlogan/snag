@@ -134,7 +134,7 @@ def half_hour_floor(dt: datetime.datetime) -> datetime.datetime:
         dt = (dt - datetime.timedelta(minutes=minute_mod30,
                                       seconds=dt.second,
                                       microseconds=dt.microsecond))
-        return dt
+    return dt
 
 
 def half_hour_ceil(dt: datetime.datetime) -> datetime.datetime:
