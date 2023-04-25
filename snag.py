@@ -33,7 +33,7 @@ class SnagTask:
     co2_actual: int = 0
     co2_worst: int = 0
     duration_scheduled: int = 10
-    duration_actual: int = 0
+    duration_actual: float = 0
     has_run: bool = False
     base_host: str = "https://api.carbonintensity.org.uk"
     tolerance: int = 5
