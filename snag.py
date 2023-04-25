@@ -13,6 +13,7 @@ import configparser
 from pathlib import Path
 import math
 from typing import Tuple, List
+import sys
 
 
 class ForecastSource(Enum):
@@ -297,6 +298,10 @@ def sleep_until_next(offset: int = 0, verbose: bool = False) -> None:
 
 
 def main():
+    if sys.version_info < (3, 7):
+        print(f"snag requires Python >3.6. Found {sys.version_info[0]}.{sys.version_info[1]}. Exiting.")
+        exit(1)
+
     try:
         home_dir = os.environ["HOME"]
     except KeyError:
