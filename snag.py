@@ -31,7 +31,9 @@ class SnagTask:
     due_by: str
     outward_code: str = '0'
     co2_actual: int = 0
-    co2_worst: int = 0
+    co2_spot: int = 0
+    co2_worst_known: int = 0
+    co2_worst_forecast: int = 0
     duration_scheduled: int = 10
     duration_actual: float = 0
     has_run: bool = False
@@ -204,7 +206,7 @@ def weight_timepoints(task: SnagTask, timepoints: List[Tuple[str, int]]) -> None
         timepoints[idx] = (timepoints[idx][0], weighted_avg)
 
 
-def schedule_task(task: SnagTask, verbose: bool = False) -> None:
+def schedule_task(task: SnagTask, first: bool = False, verbose: bool = False) -> None:
     """
     Fetch the forecast (national, regional, or by outward code) and schedule
     for time when CO2 intensity is lowest. Capture worst case intensity for
@@ -252,11 +254,19 @@ def schedule_task(task: SnagTask, verbose: bool = False) -> None:
         weight_timepoints(task, timepoints)
 
     # Go through forecast up until the "due_by" time, and schedule for lowest
-    # CO2 intensity, accounting for intensity tolerance. Capture highest
-    # intensity in forecast for reporting.
+    # CO2 intensity, accounting for intensity tolerance. On first call, capture
+    # the CO2 intensity (spot saving), then known (known worst), and forecast
     tp_now: str = timepoints[0][0]
     tp_lowest: Tuple[str, int] = timepoints[0]
-    intensity_highest: int = task.co2_worst
+    intensity_now: int = tp_lowest[1]
+
+    if first:
+        task.co2_spot = intensity_now
+
+    if intensity_now > task.co2_worst_known:
+        task.co2_worst_known = intensity_now
+
+    intensity_highest: int = task.co2_worst_forecast
     due_by_dt: datetime.datetime = datetime.datetime.fromisoformat(task.due_by)
     for tm_str, intensity in timepoints:
         tm_dt: datetime.datetime = datetime.datetime.fromisoformat(tm_str)
@@ -270,7 +280,7 @@ def schedule_task(task: SnagTask, verbose: bool = False) -> None:
         if intensity > intensity_highest:
             intensity_highest = intensity
 
-    task.co2_worst = intensity_highest
+    task.co2_worst_forecast = intensity_highest
     time_scheduled: str = tp_lowest[0]
 
     if verbose:
@@ -414,18 +424,27 @@ def main():
                     tolerance=int(config["SNAG"]["tolerance"]),
                     shell=args.shell,
                     echo_out=echo_out)
-    schedule_task(task, verbose)
+    schedule_task(task, first=True, verbose=verbose)
 
     while not task.has_run:
         sleep_until_next(int(config["SNAG"]["delay"]), verbose)
-        schedule_task(task, verbose)
+        schedule_task(task, verbose=verbose)
 
     time_now: str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    potential_saving: int = abs(int(((task.co2_actual / task.co2_worst) - 1) * 100))
+    savings: List[int] = [0] * 3
+
+    for saving, intensity in enumerate([task.co2_spot,
+                                        task.co2_worst_known,
+                                        task.co2_worst_forecast]):
+        savings[saving] = abs(int(((task.co2_actual / intensity) - 1) * 100))
+
     print(f"snag @ {time_now}")
-    print(f"    Task:       {task.cmd}")
-    print(f"    Duration:   {task.duration_actual:.2f} s @ {task.co2_actual} gCO2/kWh")
-    print(f"    CO2 saving: {potential_saving}%")
+    print(f"    Task:         {task.cmd}")
+    print(f"    Duration:     {task.duration_actual:.2f} s @ {task.co2_actual} gCO2/kWh")
+    print(f"    CO2 saving:")
+    print(f"      - Spot:     {savings[0]}%")
+    print(f"      - Known:    {savings[1]}%")
+    print(f"      - Forecast: {savings[2]}%")
 
 
 if __name__ == "__main__":
