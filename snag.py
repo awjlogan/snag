@@ -12,7 +12,7 @@ import os
 import configparser
 from pathlib import Path
 import math
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 import sys
 
 
@@ -33,7 +33,7 @@ class SnagTask:
     co2_actual: int = 0
     co2_worst: int = 0
     duration_scheduled: int = 10
-    duration_actual: int = 0
+    duration_actual: float = 0
     has_run: bool = False
     base_host: str = "https://api.carbonintensity.org.uk"
     tolerance: int = 5
@@ -48,7 +48,7 @@ class SnagTask:
         self.due_by = due_by_dt.strftime("%Y-%m-%dT%H:%M")
 
 
-def query_api(url: str, verbose: bool = False) -> json:
+def query_api(url: str, verbose: bool = False) -> Dict:
     """
     Send a query to National Grid API and return the JSON representation
     :param url: full string to fetch from
@@ -83,7 +83,7 @@ def query_api(url: str, verbose: bool = False) -> json:
     try:
         data = page.read()
         encoding = page.info().get_content_charset("utf-8")
-        return_json: json = json.loads(data.decode(encoding))
+        return_json: Dict = json.loads(data.decode(encoding))
     except Exception as e:
         print(f"Unhandled error parsing JSON: {e}")
         exit(1)
@@ -91,7 +91,7 @@ def query_api(url: str, verbose: bool = False) -> json:
     return return_json
 
 
-def decompose_fw48(data: json,
+def decompose_fw48(data: Dict,
                    forecast_type: ForecastSource) -> List[Tuple[str, int]]:
     """
     Decompose a 48 hour forecast into a list of (ISO8601, intensity) pairs.
@@ -134,7 +134,7 @@ def half_hour_floor(dt: datetime.datetime) -> datetime.datetime:
         dt = (dt - datetime.timedelta(minutes=minute_mod30,
                                       seconds=dt.second,
                                       microseconds=dt.microsecond))
-        return dt
+    return dt
 
 
 def half_hour_ceil(dt: datetime.datetime) -> datetime.datetime:
@@ -242,7 +242,7 @@ def schedule_task(task: SnagTask, verbose: bool = False) -> None:
         forecast_type = ForecastSource.POSTCODE
 
     # Fetch from the NG API, decompose into list of (time, intensity) points
-    ng_data: json = query_api(get_dest, verbose)
+    ng_data: Dict = query_api(get_dest, verbose)
     timepoints: List[Tuple[str, int]] = decompose_fw48(ng_data, forecast_type)
 
     # If the task will cross a 30 minute boundary, then calculate the weighted
