@@ -212,6 +212,7 @@ def schedule_task(task: SnagTask, first: bool = False, verbose: bool = False) ->
     for time when CO2 intensity is lowest. Capture worst case intensity for
     reporting as well.
     :param task: SnagTask dataclass with all information required
+    :param first: indicates this is the first schedule
     :param verbose: verbosity flag to stdout
     :return: None
     """
@@ -297,13 +298,17 @@ def schedule_task(task: SnagTask, first: bool = False, verbose: bool = False) ->
 def sleep_until_next(offset: int = 0, verbose: bool = False) -> None:
     """
     Sleep until the next 30 minute interval
+    :param offset: offset (in minutes) from 30 minute interval
+    :param verbose: verbose output
     """
     next_wake: datetime.datetime = half_hour_ceil(datetime.datetime.now())
-    next_wake = next_wake + datetime.timedelta(minutes=offset)
+    # Add an additional 1 s to account for residual microseconds
+    next_wake = next_wake + datetime.timedelta(minutes=offset, seconds=1)
     sleep_time: datetime.timedelta = next_wake - datetime.datetime.now()
     if verbose:
         wake_time: str = next_wake.strftime("%Y-%m-%d %H:%M")
         print(f"    Sleeping until : {wake_time} ({int(sleep_time.seconds / 60)}m{sleep_time.seconds % 60}s)")
+
     time.sleep(sleep_time.seconds)
 
 
@@ -441,7 +446,7 @@ def main():
     print(f"snag @ {time_now}")
     print(f"    Task:         {task.cmd}")
     print(f"    Duration:     {task.duration_actual:.2f} s @ {task.co2_actual} gCO2/kWh")
-    print(f"    CO2 saving:")
+    print("    CO2 saving:")
     print(f"      - Spot:     {savings[0]}%")
     print(f"      - Known:    {savings[1]}%")
     print(f"      - Forecast: {savings[2]}%")
