@@ -8,11 +8,11 @@ lazily updated when required and pruned when unused for a period of time.
 """
 
 import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib import request
-from time import sleep
-import urllib.error
 import sys
+import urllib.error
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from time import sleep
+from urllib import request
 
 
 class Sizzler(BaseHTTPRequestHandler):
