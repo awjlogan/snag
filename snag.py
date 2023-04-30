@@ -1,6 +1,5 @@
 import argparse
 import configparser
-import datetime
 import json
 import math
 import os
@@ -10,6 +9,7 @@ import sys
 import time
 import urllib.error
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -45,8 +45,8 @@ class SnagTask:
 
     def __post_init__(self):
         # Scale the due by time factoring duration and time offset
-        due_by_dt: datetime.datetime = datetime.datetime.fromisoformat(self.due_by)
-        due_by_dt = due_by_dt - datetime.timedelta(minutes=(self.time_offset + self.duration_scheduled))
+        due_by_dt: datetime = datetime.fromisoformat(self.due_by)
+        due_by_dt = due_by_dt - timedelta(minutes=(self.time_offset + self.duration_scheduled))
         self.due_by = due_by_dt.strftime("%Y-%m-%dT%H:%M")
 
 
@@ -112,8 +112,8 @@ def decompose_fw48(data: Dict,
 
     # The NG API may return the previous 30 minute interval as the first
     # entry. If this is the case, then remove this entry.
-    time_first: datetime.datetime = datetime.datetime.fromisoformat(extract[0]["from"].rstrip('Z'))
-    time_now: datetime.datetime = half_hour_floor(datetime.datetime.now())
+    time_first: datetime = datetime.fromisoformat(extract[0]["from"].rstrip('Z'))
+    time_now: datetime = half_hour_floor(datetime.now())
     if time_first < time_now:
         extract = extract[1:]
 
@@ -125,7 +125,7 @@ def decompose_fw48(data: Dict,
     return ret_list
 
 
-def half_hour_floor(dt: datetime.datetime) -> datetime.datetime:
+def half_hour_floor(dt: datetime) -> datetime:
     """
     Round a datetime object down to nearest 30 minute
     :param dt: datetime object to round
@@ -133,20 +133,20 @@ def half_hour_floor(dt: datetime.datetime) -> datetime.datetime:
     """
     minute_mod30: int = dt.minute % 30
     if minute_mod30 or dt.second or dt.microsecond:
-        dt = (dt - datetime.timedelta(minutes=minute_mod30,
-                                      seconds=dt.second,
-                                      microseconds=dt.microsecond))
+        dt = (dt - timedelta(minutes=minute_mod30,
+                             seconds=dt.second,
+                             microseconds=dt.microsecond))
     return dt
 
 
-def half_hour_ceil(dt: datetime.datetime) -> datetime.datetime:
+def half_hour_ceil(dt: datetime) -> datetime:
     """
     Round a datetime object up to nearest 30 minute
     :param dt: datetime object to round
     :return: datetime rounded up to nearest 30 min
     """
-    dt_floor: datetime.datetime = half_hour_floor(dt)
-    return dt_floor + datetime.timedelta(minutes=30)
+    dt_floor: datetime = half_hour_floor(dt)
+    return dt_floor + timedelta(minutes=30)
 
 
 def run_task(task: SnagTask, verbose: bool = False) -> None:
@@ -219,7 +219,7 @@ def schedule_task(task: SnagTask, first: bool = False, verbose: bool = False) ->
 
     # Switch fetch source dependent on information provided. 0 -> national,
     # 1-17: regional, other: outward code
-    time_now: datetime.datetime = datetime.datetime.now()
+    time_now: datetime = datetime.now()
     time_now_floor: str = half_hour_floor(time_now).isoformat()
     get_dest: str = ""
     forecast_type: ForecastSource = ForecastSource.NATIONAL
@@ -268,9 +268,9 @@ def schedule_task(task: SnagTask, first: bool = False, verbose: bool = False) ->
         task.co2_worst_known = intensity_now
 
     intensity_highest: int = task.co2_worst_forecast
-    due_by_dt: datetime.datetime = datetime.datetime.fromisoformat(task.due_by)
+    due_by_dt: datetime = datetime.fromisoformat(task.due_by)
     for tm_str, intensity in timepoints:
-        tm_dt: datetime.datetime = datetime.datetime.fromisoformat(tm_str)
+        tm_dt: datetime = datetime.fromisoformat(tm_str)
         if tm_dt > due_by_dt:
             break
 
@@ -301,10 +301,10 @@ def sleep_until_next(offset: int = 0, verbose: bool = False) -> None:
     :param offset: offset (in minutes) from 30 minute interval
     :param verbose: verbose output
     """
-    next_wake: datetime.datetime = half_hour_ceil(datetime.datetime.now())
+    next_wake: datetime = half_hour_ceil(datetime.now())
     # Add an additional 1 s to account for residual microseconds
-    next_wake = next_wake + datetime.timedelta(minutes=offset, seconds=1)
-    sleep_time: datetime.timedelta = next_wake - datetime.datetime.now()
+    next_wake = next_wake + timedelta(minutes=offset, seconds=1)
+    sleep_time: timedelta = next_wake - datetime.now()
     if verbose:
         wake_time: str = next_wake.strftime("%Y-%m-%d %H:%M")
         print(f"    Sleeping until : {wake_time} ({int(sleep_time.seconds / 60)}m{sleep_time.seconds % 60}s)")
@@ -410,12 +410,11 @@ def main():
 
     # If the due_by argument has been given as a numeric value, then convert
     # to an ISO8601 format time ahead of now. Otherwise, strip trailing Z if
-    # present as datetime.datetime.isoformat does not handle it correctly.
+    # present as datetime.isoformat does not handle it correctly.
     due_by: str = args.due_by
     try:
         time_ahead: float = float(args.due_by)
-        time_now: datetime.datetime = datetime.datetime.now()
-        due_by = (datetime.datetime.now() + datetime.timedelta(hours=time_ahead)).isoformat()
+        due_by = (datetime.now() + timedelta(hours=time_ahead)).isoformat()
     except ValueError:
         due_by = due_by.rstrip('Z')
 
@@ -435,7 +434,7 @@ def main():
         sleep_until_next(int(config["SNAG"]["delay"]), verbose)
         schedule_task(task, verbose=verbose)
 
-    time_now: str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    time_now: str = datetime.now().strftime("%Y-%m-%d %H:%M")
     savings: List[int] = [0] * 3
 
     for saving, intensity in enumerate([task.co2_spot,
