@@ -1,19 +1,19 @@
 import argparse
-import datetime
-import time
-from dataclasses import dataclass
-import json
-from enum import Enum
-import urllib.error
-from urllib import request
-import subprocess
-import shlex
-import os
 import configparser
-from pathlib import Path
+import datetime
+import json
 import math
-from typing import Tuple, List, Dict
+import os
+import shlex
+import subprocess
 import sys
+import time
+import urllib.error
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Dict, List, Tuple
+from urllib import request
 
 
 class ForecastSource(Enum):
