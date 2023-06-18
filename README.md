@@ -51,6 +51,7 @@ The following switches are available on `snag`'s command line. They can also be 
 | -sh, --shell        | *None*                     | *False*                            | Run the task in shell. Reported duration may be incorrect |
 | -t, --tolerance     | 0 \< tolerance \< 100      | 5                                  | Minimum carbon saving to reschedule to later time |
 | -v, --verbose       | *None*                     | *False*                            | Verbose output from `snag` |
+| -w, --working_dir   | Path to run task in        | ./                                 | Path to run the *task* in |
 
 #### Configuration File
 
