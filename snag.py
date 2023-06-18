@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
+from socket import timeout
 from typing import Dict, List, Tuple
 from urllib import request
 
@@ -42,6 +43,7 @@ class SnagTask:
     time_offset: int = 0
     shell: bool = False
     echo_out: bool = False
+    working_dir: str = "./"
 
     def __post_init__(self):
         # Scale the due by time factoring duration and time offset
@@ -67,13 +69,21 @@ def query_api(url: str, verbose: bool = False) -> Dict:
 
         attempts += 1
         try:
-            page = request.urlopen(url)
+            page = request.urlopen(url, timeout=10)
             if verbose:
                 print("Done!")
             success = True
-        except urllib.error.HTTPError:
+        except urllib.error.HTTPError as e:
             if verbose:
-                print(f"Failed. Sleeping {delay} s")
+                print(f"    Fetch from National Grid failed ({e}). Retrying in {delay} s")
+            time.sleep(delay)
+            delay *= 2
+            continue
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, timeout):
+                print(f"    Fetch from National Grid timed out ({e}). Retrying in {delay} s")
+            else:
+                print(f"    Fetch from National Grid failed ({e}). Retrying in {delay} s")
             time.sleep(delay)
             delay *= 2
             continue
@@ -163,8 +173,9 @@ def run_task(task: SnagTask, verbose: bool = False) -> None:
         cmd: List[str] = shlex.split(task.cmd)
 
     start: float = time.time()
-    p = subprocess.run(cmd, shell=task.shell,
-                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    p = subprocess.run(cmd, shell=task.shell, cwd=task.working_dir,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                       text=True)
     task.duration_actual = time.time() - start
     task.has_run = True
 
@@ -172,7 +183,8 @@ def run_task(task: SnagTask, verbose: bool = False) -> None:
         print(p.stdout)
 
 
-def weight_timepoints(task: SnagTask, timepoints: List[Tuple[str, int]]) -> None:
+def weight_timepoints(task: SnagTask,
+                      timepoints: List[Tuple[str, int]]) -> None:
     """
     Weight the timepoints for intensity for a given task duration and offset
     :param task: the SnagTask object, this contains the needed task data
@@ -206,7 +218,8 @@ def weight_timepoints(task: SnagTask, timepoints: List[Tuple[str, int]]) -> None
         timepoints[idx] = (timepoints[idx][0], weighted_avg)
 
 
-def schedule_task(task: SnagTask, first: bool = False, verbose: bool = False) -> None:
+def schedule_task(task: SnagTask, first: bool = False,
+                  verbose: bool = False) -> None:
     """
     Fetch the forecast (national, regional, or by outward code) and schedule
     for time when CO2 intensity is lowest. Capture worst case intensity for
@@ -348,6 +361,8 @@ def main():
                         help="Minimum gCO2/kWh saving to reschedule (%%).")
     parser.add_argument("-v", "--verbose", action="store_const", const="yes",
                         help="Verbose output.")
+    parser.add_argument("-w", "--working_dir", default="./a", type=str,
+                        help="Directory to run the task in. Default is current directory.")
     parser.add_argument("--version", action="version",
                         version="%(prog)s 0.1.0\n\
                                  Copyright © 2023 Angus Logan\n\
@@ -426,8 +441,8 @@ def main():
                     outward_code=config["SNAG"]["outward_code"],
                     time_offset=int(config["SNAG"]["delay"]),
                     tolerance=int(config["SNAG"]["tolerance"]),
-                    shell=args.shell,
-                    echo_out=echo_out)
+                    working_dir=args.working_dir,
+                    shell=args.shell, echo_out=echo_out)
     schedule_task(task, first=True, verbose=verbose)
 
     while not task.has_run:
