@@ -173,9 +173,14 @@ def run_task(task: SnagTask, verbose: bool = False) -> None:
         cmd: List[str] = shlex.split(task.cmd)
 
     start: float = time.time()
-    p = subprocess.run(cmd, shell=task.shell, cwd=task.working_dir,
-                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                       text=True)
+    try:
+        p = subprocess.run(cmd, shell=task.shell, cwd=task.working_dir,
+                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                           text=True)
+    except FileNotFoundError:
+        print(f"Command {task.cmd} not found!")
+        exit(1)
+
     task.duration_actual = time.time() - start
     task.has_run = True
 
