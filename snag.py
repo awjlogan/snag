@@ -36,7 +36,7 @@ class SnagTask:
     co2_worst_known: int = 0
     co2_worst_forecast: int = 0
     duration_scheduled: int = 10
-    duration_actual: float = 0
+    duration_actual: datetime = 0
     has_run: bool = False
     base_host: str = "https://api.carbonintensity.org.uk"
     tolerance: int = 5
@@ -172,7 +172,7 @@ def run_task(task: SnagTask, verbose: bool = False) -> None:
         print(f"    Running task: {task.cmd}")
         cmd: List[str] = shlex.split(task.cmd)
 
-    start: float = time.time()
+    start: datetime = datetime.now()
     try:
         p = subprocess.run(cmd, shell=task.shell, cwd=task.working_dir,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -181,7 +181,7 @@ def run_task(task: SnagTask, verbose: bool = False) -> None:
         print(f"Command {task.cmd} not found!")
         exit(1)
 
-    task.duration_actual = time.time() - start
+    task.duration_actual = datetime.now() - start
     task.has_run = True
 
     if task.echo_out:
@@ -366,7 +366,7 @@ def main():
                         help="Minimum gCO2/kWh saving to reschedule (%%).")
     parser.add_argument("-v", "--verbose", action="store_const", const="yes",
                         help="Verbose output.")
-    parser.add_argument("-w", "--working_dir", default="./a", type=str,
+    parser.add_argument("-w", "--working_dir", default="./", type=str,
                         help="Directory to run the task in. Default is current directory.")
     parser.add_argument("--version", action="version",
                         version="%(prog)s 0.1.0\n\
@@ -464,7 +464,7 @@ def main():
 
     print(f"snag @ {time_now}")
     print(f"    Task:         {task.cmd}")
-    print(f"    Duration:     {task.duration_actual:.2f} s @ {task.co2_actual} gCO2/kWh")
+    print(f"    Duration:     {task.duration_actual} @ {task.co2_actual} gCO2/kWh")
     print("    CO2 saving:")
     print(f"      - Spot:     {savings[0]}%")
     print(f"      - Known:    {savings[1]}%")
