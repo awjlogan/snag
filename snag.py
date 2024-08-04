@@ -28,9 +28,10 @@ class SnagTask:
     """
     Groups all the properties needed for snag to schedule, run, and report
     """
+
     cmd: str
     due_by: str
-    outward_code: str = '0'
+    outward_code: str = "0"
     co2_actual: int = 0
     co2_spot: int = 0
     co2_worst_known: int = 0
@@ -48,7 +49,9 @@ class SnagTask:
     def __post_init__(self):
         # Scale the due by time factoring duration and time offset
         due_by_dt: datetime = datetime.fromisoformat(self.due_by)
-        due_by_dt = due_by_dt - timedelta(minutes=(self.time_offset + self.duration_scheduled))
+        due_by_dt = due_by_dt - timedelta(
+            minutes=(self.time_offset + self.duration_scheduled)
+        )
         self.due_by = due_by_dt.strftime("%Y-%m-%dT%H:%M")
 
 
@@ -75,15 +78,21 @@ def query_api(url: str, verbose: bool = False) -> Dict:
             success = True
         except urllib.error.HTTPError as e:
             if verbose:
-                print(f"    Fetch from National Grid failed ({e}). Retrying in {delay} s")
+                print(
+                    f"    Fetch from National Grid failed ({e}). Retrying in {delay} s"
+                )
             time.sleep(delay)
             delay *= 2
             continue
         except urllib.error.URLError as e:
             if isinstance(e.reason, timeout):
-                print(f"    Fetch from National Grid timed out ({e}). Retrying in {delay} s")
+                print(
+                    f"    Fetch from National Grid timed out ({e}). Retrying in {delay} s"
+                )
             else:
-                print(f"    Fetch from National Grid failed ({e}). Retrying in {delay} s")
+                print(
+                    f"    Fetch from National Grid failed ({e}). Retrying in {delay} s"
+                )
             time.sleep(delay)
             delay *= 2
             continue
@@ -103,8 +112,7 @@ def query_api(url: str, verbose: bool = False) -> Dict:
     return return_json
 
 
-def decompose_fw48(data: Dict,
-                   forecast_type: ForecastSource) -> List[Tuple[str, int]]:
+def decompose_fw48(data: Dict, forecast_type: ForecastSource) -> List[Tuple[str, int]]:
     """
     Decompose a 48 hour forecast into a list of (ISO8601, intensity) pairs.
     Datastructure dependent on source (National, (Regional | Postcode))
@@ -122,13 +130,13 @@ def decompose_fw48(data: Dict,
 
     # The NG API may return the previous 30 minute interval as the first
     # entry. If this is the case, then remove this entry.
-    time_first: datetime = datetime.fromisoformat(extract[0]["from"].rstrip('Z'))
+    time_first: datetime = datetime.fromisoformat(extract[0]["from"].rstrip("Z"))
     time_now: datetime = half_hour_floor(datetime.now())
     if time_first < time_now:
         extract = extract[1:]
 
     for timepoint in extract:
-        dt: str = timepoint["from"].rstrip('Z')
+        dt: str = timepoint["from"].rstrip("Z")
         intensity: int = int(timepoint["intensity"]["forecast"])
         ret_list.append((dt, intensity))
 
@@ -143,9 +151,9 @@ def half_hour_floor(dt: datetime) -> datetime:
     """
     minute_mod30: int = dt.minute % 30
     if minute_mod30 or dt.second or dt.microsecond:
-        dt = (dt - timedelta(minutes=minute_mod30,
-                             seconds=dt.second,
-                             microseconds=dt.microsecond))
+        dt = dt - timedelta(
+            minutes=minute_mod30, seconds=dt.second, microseconds=dt.microsecond
+        )
     return dt
 
 
@@ -174,9 +182,14 @@ def run_task(task: SnagTask, verbose: bool = False) -> None:
 
     start: datetime = datetime.now()
     try:
-        p = subprocess.run(cmd, shell=task.shell, cwd=task.working_dir,
-                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                           text=True)
+        p = subprocess.run(
+            cmd,
+            shell=task.shell,
+            cwd=task.working_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
     except FileNotFoundError:
         print(f"Command {task.cmd} not found!")
         exit(1)
@@ -188,8 +201,7 @@ def run_task(task: SnagTask, verbose: bool = False) -> None:
         print(p.stdout)
 
 
-def weight_timepoints(task: SnagTask,
-                      timepoints: List[Tuple[str, int]]) -> None:
+def weight_timepoints(task: SnagTask, timepoints: List[Tuple[str, int]]) -> None:
     """
     Weight the timepoints for intensity for a given task duration and offset
     :param task: the SnagTask object, this contains the needed task data
@@ -218,13 +230,14 @@ def weight_timepoints(task: SnagTask,
     # implicitly shrink the timepoints list (overflow at the end), but values
     # here will not be used anyway as the task must have started before that
     for idx in range(len(timepoints) - len(window)):
-        weighted_avg: int = sum([a * b[1] for a, b in zip(window, timepoints[idx:(idx + len(window))])])
+        weighted_avg: int = sum(
+            [a * b[1] for a, b in zip(window, timepoints[idx : (idx + len(window))])]
+        )
         weighted_avg = int(weighted_avg / sum(window))
         timepoints[idx] = (timepoints[idx][0], weighted_avg)
 
 
-def schedule_task(task: SnagTask, first: bool = False,
-                  verbose: bool = False) -> None:
+def schedule_task(task: SnagTask, first: bool = False, verbose: bool = False) -> None:
     """
     Fetch the forecast (national, regional, or by outward code) and schedule
     for time when CO2 intensity is lowest. Capture worst case intensity for
@@ -268,7 +281,9 @@ def schedule_task(task: SnagTask, first: bool = False,
 
     # If the task will cross a 30 minute boundary, then calculate the weighted
     # mean intensity over that time period.
-    crosses_boundary: bool = (task.duration_scheduled + task.time_offset > 30) or (task.duration_scheduled > 30)
+    crosses_boundary: bool = (task.duration_scheduled + task.time_offset > 30) or (
+        task.duration_scheduled > 30
+    )
     if crosses_boundary:
         weight_timepoints(task, timepoints)
 
@@ -325,14 +340,18 @@ def sleep_until_next(offset: int = 0, verbose: bool = False) -> None:
     sleep_time: timedelta = next_wake - datetime.now()
     if verbose:
         wake_time: str = next_wake.strftime("%Y-%m-%d %H:%M")
-        print(f"    Sleeping until : {wake_time} ({int(sleep_time.seconds / 60)}m{sleep_time.seconds % 60}s)")
+        print(
+            f"    Sleeping until : {wake_time} ({int(sleep_time.seconds / 60)}m{sleep_time.seconds % 60}s)"
+        )
 
     time.sleep(sleep_time.seconds)
 
 
 def main():
     if sys.version_info < (3, 7):
-        print(f"snag requires Python >3.6. Found {sys.version_info[0]}.{sys.version_info[1]}. Exiting.")
+        print(
+            f"snag requires Python >3.6. Found {sys.version_info[0]}.{sys.version_info[1]}. Exiting."
+        )
         exit(1)
 
     try:
@@ -343,44 +362,71 @@ def main():
     parser = argparse.ArgumentParser(
         prog="snag",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="Scheduling your task to minimise its carbon impact.")
+        description="Scheduling your task to minimise its carbon impact.",
+    )
 
     # Optionals - the defaults are loaded from the configuration file, anything
     # specified here will override the configuration file values.
-    parser.add_argument("-a", "--base_host",
-                        help="National Grid API base host path.")
-    parser.add_argument("-c", "--cfg",
-                        default=f'{home_dir}/.config/snag/snag.ini',
-                        help="Path to configuration file. Any supplied arguments will override values here.")
-    parser.add_argument("-d", "--delay",
-                        help="Offset start time from 30 min interval, in minutes.")
-    parser.add_argument("-e", "--echo_out", action="store_true",
-                        help="Print the task's stdout/stderr to stdout when complete.")
-    parser.add_argument("-l", "--duration", default=10, type=float,
-                        help="Task's duration in minutes.")
-    parser.add_argument("-oc", "--outward_code",
-                        help="Outward (first) part of UK postcode, e.g. NW1, or region code defined in National Grid API.")
-    parser.add_argument("-sh", "--shell", action="store_true",
-                        help="Run task in shell. Reported duration may not be accurate.")
-    parser.add_argument("-t", "--tolerance",
-                        help="Minimum gCO2/kWh saving to reschedule (%%).")
-    parser.add_argument("-v", "--verbose", action="store_const", const="yes",
-                        help="Verbose output.")
-    parser.add_argument("-w", "--working_dir", default="./", type=str,
-                        help="Directory to run the task in. Default is current directory.")
-    parser.add_argument("--version", action="version",
-                        version="%(prog)s 0.1.0\n\
+    parser.add_argument("-a", "--base_host", help="National Grid API base host path.")
+    parser.add_argument(
+        "-c",
+        "--cfg",
+        default=f"{home_dir}/.config/snag/snag.ini",
+        help="Path to configuration file. Any supplied arguments will override values here.",
+    )
+    parser.add_argument(
+        "-d", "--delay", help="Offset start time from 30 min interval, in minutes."
+    )
+    parser.add_argument(
+        "-e",
+        "--echo_out",
+        action="store_true",
+        help="Print the task's stdout/stderr to stdout when complete.",
+    )
+    parser.add_argument(
+        "-l", "--duration", default=10, type=float, help="Task's duration in minutes."
+    )
+    parser.add_argument(
+        "-oc",
+        "--outward_code",
+        help="Outward (first) part of UK postcode, e.g. NW1, or region code defined in National Grid API.",
+    )
+    parser.add_argument(
+        "-sh",
+        "--shell",
+        action="store_true",
+        help="Run task in shell. Reported duration may not be accurate.",
+    )
+    parser.add_argument(
+        "-t", "--tolerance", help="Minimum gCO2/kWh saving to reschedule (%%)."
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_const", const="yes", help="Verbose output."
+    )
+    parser.add_argument(
+        "-w",
+        "--working_dir",
+        default="./",
+        type=str,
+        help="Directory to run the task in. Default is current directory.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version="%(prog)s 0.1.0\n\
                                  Copyright © 2023 Angus Logan\n\
                                  License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\n\
                                  This is free software: you are free to change and redistribute it.\n\
                                  There is NO WARRANTY, to the extent permitted by law.\n\n\
-                                 Written by Angus Logan, for Bear and Moose.")
+                                 Written by Angus Logan, for Bear and Moose.",
+    )
 
     # Required arguments
-    parser.add_argument("due_by",
-                        help="Time the task is due by. This can be in ISO8601 format (YYYY-MM-DDTHH:MMZ), or the number of hours ahead of the current time.")
-    parser.add_argument("cmd", nargs='+',
-                        help="The command to be run.")
+    parser.add_argument(
+        "due_by",
+        help="Time the task is due by. This can be in ISO8601 format (YYYY-MM-DDTHH:MMZ), or the number of hours ahead of the current time.",
+    )
+    parser.add_argument("cmd", nargs="+", help="The command to be run.")
 
     args = parser.parse_args()
 
@@ -394,17 +440,19 @@ def main():
             print(f"Failed to read configuration file {args.cfg}: {e}")
             exit(1)
     else:
-        config["SNAG"] = {"delay": "0",
-                          "base_host": "https://api.carbonintensity.org.uk",
-                          "tolerance": "5",
-                          "outward_code": "0",
-                          "verbose": "no",
-                          "echo_out": "no"}
+        config["SNAG"] = {
+            "delay": "0",
+            "base_host": "https://api.carbonintensity.org.uk",
+            "tolerance": "5",
+            "outward_code": "0",
+            "verbose": "no",
+            "echo_out": "no",
+        }
         try:
             cfg_dir = Path(args.cfg).parents[0]
             p = Path(cfg_dir)
             p.mkdir(parents=True)
-            with open(args.cfg, 'w') as f:
+            with open(args.cfg, "w") as f:
                 config.write(f)
             if args.verbose:
                 print(f"Created configuration file: {args.cfg}")
@@ -436,18 +484,22 @@ def main():
         time_ahead: float = float(args.due_by)
         due_by = (datetime.now() + timedelta(hours=time_ahead)).isoformat()
     except ValueError:
-        due_by = due_by.rstrip('Z')
+        due_by = due_by.rstrip("Z")
 
     # Construct the task object, and start scheduling
-    cmd = ''.join(args.cmd)
-    task = SnagTask(cmd=cmd, due_by=due_by,
-                    duration_scheduled=math.ceil(args.duration),
-                    base_host=config["SNAG"]["base_host"],
-                    outward_code=config["SNAG"]["outward_code"],
-                    time_offset=int(config["SNAG"]["delay"]),
-                    tolerance=int(config["SNAG"]["tolerance"]),
-                    working_dir=args.working_dir,
-                    shell=args.shell, echo_out=echo_out)
+    cmd = "".join(args.cmd)
+    task = SnagTask(
+        cmd=cmd,
+        due_by=due_by,
+        duration_scheduled=math.ceil(args.duration),
+        base_host=config["SNAG"]["base_host"],
+        outward_code=config["SNAG"]["outward_code"],
+        time_offset=int(config["SNAG"]["delay"]),
+        tolerance=int(config["SNAG"]["tolerance"]),
+        working_dir=args.working_dir,
+        shell=args.shell,
+        echo_out=echo_out,
+    )
     schedule_task(task, first=True, verbose=verbose)
 
     while not task.has_run:
@@ -457,9 +509,9 @@ def main():
     time_now: str = datetime.now().strftime("%Y-%m-%d %H:%M")
     savings: List[int] = [0] * 3
 
-    for saving, intensity in enumerate([task.co2_spot,
-                                        task.co2_worst_known,
-                                        task.co2_worst_forecast]):
+    for saving, intensity in enumerate(
+        [task.co2_spot, task.co2_worst_known, task.co2_worst_forecast]
+    ):
         savings[saving] = abs(int(((task.co2_actual / intensity) - 1) * 100))
 
     print(f"snag @ {time_now}")

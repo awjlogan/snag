@@ -16,7 +16,6 @@ from urllib import request
 
 
 class Sizzler(BaseHTTPRequestHandler):
-
     cache: dict[str, tuple[str, bytearray]] = {}
 
     @staticmethod
@@ -28,9 +27,9 @@ class Sizzler(BaseHTTPRequestHandler):
         """
         mins_mod30: int = dt.minute % 30
         if mins_mod30 or dt.second or dt.microsecond:
-            dt = dt - datetime.timedelta(minutes=mins_mod30,
-                                         seconds=dt.second,
-                                         microseconds=dt.microsecond)
+            dt = dt - datetime.timedelta(
+                minutes=mins_mod30, seconds=dt.second, microseconds=dt.microsecond
+            )
         return dt
 
     def fetch_ng(self) -> bytearray:
@@ -59,7 +58,7 @@ class Sizzler(BaseHTTPRequestHandler):
         # 1-17  Regional
         # Other Regional by postcode
         print(self.path)
-        split_path: list[str] = self.path.split('/')[1:]
+        split_path: list[str] = self.path.split("/")[1:]
         cache_key: str | None = None
         update_reqd: bool = False
         time_now: datetime.datetime = datetime.datetime.now()
@@ -68,7 +67,7 @@ class Sizzler(BaseHTTPRequestHandler):
             if len(split_path) != 3:
                 cache_key = split_path[-1]
             else:
-                cache_key = '0'
+                cache_key = "0"
 
         # Rounding the last updated time up and the current time down, if these
         # are not the same, then the forecast needs to be updated. If the key
@@ -84,8 +83,7 @@ class Sizzler(BaseHTTPRequestHandler):
             update_reqd = True
 
         if update_reqd and cache_key:
-            self.cache[cache_key] = (time_now.isoformat(),
-                                     self.fetch_ng())
+            self.cache[cache_key] = (time_now.isoformat(), self.fetch_ng())
 
         self.send_response(200)
         self.end_headers()
